@@ -25,6 +25,8 @@
 
 - (void)memoryWarning:(NSNotification*)notification;
 
+- (void)setTransformForCurrentOrientation:(BOOL)animated;
+
 @end
 
 
@@ -38,7 +40,7 @@ static SVProgressHUD *sharedView = nil;
 	
 	if(sharedView == nil)
 		sharedView = [[SVProgressHUD alloc] initWithFrame:CGRectZero];
-	
+    
 	return sharedView;
 }
 
@@ -158,6 +160,10 @@ static SVProgressHUD *sharedView = nil;
         
         [self addSubview:_hudView];
         [_hudView release];
+        
+        [self setTransformForCurrentOrientation:NO];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(deviceOrientationDidChange:) 
+                                                     name:UIDeviceOrientationDidChangeNotification object:nil];
     }
 	
     return self;
@@ -363,5 +369,51 @@ static SVProgressHUD *sharedView = nil;
         sharedView = nil;
     }
 }
+
+#pragma mark -
+#pragma mark Manual oritentation change
+
+#define RADIANS(degrees) ((degrees * (float)M_PI) / 180.0f)
+
+- (void)deviceOrientationDidChange:(NSNotification *)notification { 
+	if (!self.superview) {
+		return;
+	}
+	if ([self.superview isKindOfClass:[UIWindow class]]) {
+		[self setTransformForCurrentOrientation:YES];
+	}
+}
+
+- (void)setTransformForCurrentOrientation:(BOOL)animated {
+	UIInterfaceOrientation orientation = [UIApplication sharedApplication].statusBarOrientation;
+	NSInteger degrees = 0;
+	
+	// Stay in sync with the superview
+	if (self.superview) {
+		self.bounds = self.superview.bounds;
+		[self setNeedsDisplay];
+	}
+	
+	if (UIInterfaceOrientationIsLandscape(orientation)) {
+		if (orientation == UIInterfaceOrientationLandscapeLeft) { degrees = -90; } 
+		else { degrees = 90; }
+		// Window coordinates differ!
+		self.bounds = CGRectMake(0, 0, self.bounds.size.height, self.bounds.size.width);
+	} else {
+		if (orientation == UIInterfaceOrientationPortraitUpsideDown) { degrees = 180; } 
+		else { degrees = 0; }
+	}
+	
+	CGAffineTransform rotationTransform = CGAffineTransformMakeRotation(RADIANS(degrees));
+    
+	if (animated) {
+		[UIView beginAnimations:nil context:nil];
+	}
+	[self setTransform:rotationTransform];
+	if (animated) {
+		[UIView commitAnimations];
+	}
+}
+
 
 @end
